@@ -1,0 +1,143 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { Restaurant } from "@/types";
+import { CATEGORIES } from "@/types";
+
+declare global {
+  interface Window {
+    kakao: any;
+  }
+}
+
+interface KakaoMapProps {
+  restaurants: Restaurant[];
+  selectedId: string | null;
+  onSelect: (restaurant: Restaurant) => void;
+  onMapClick: (lat: number, lng: number) => void;
+}
+
+// 순천향대학교 좌표
+const SCH_CENTER = { lat: 36.7726, lng: 126.9336 };
+
+export default function KakaoMap({
+  restaurants,
+  selectedId,
+  onSelect,
+  onMapClick,
+}: KakaoMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Load Kakao Maps SDK
+  useEffect(() => {
+    if (window.kakao?.maps) {
+      setMapLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`;
+    script.onload = () => {
+      window.kakao.maps.load(() => setMapLoaded(true));
+    };
+    document.head.appendChild(script);
+  }, []);
+
+  // Initialize map
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || mapInstanceRef.current) return;
+
+    const map = new window.kakao.maps.Map(mapRef.current, {
+      center: new window.kakao.maps.LatLng(SCH_CENTER.lat, SCH_CENTER.lng),
+      level: 4,
+    });
+
+    mapInstanceRef.current = map;
+
+    // University marker
+    const schMarker = new window.kakao.maps.Marker({
+      position: new window.kakao.maps.LatLng(SCH_CENTER.lat, SCH_CENTER.lng),
+      map,
+    });
+
+    const infoWindow = new window.kakao.maps.InfoWindow({
+      content:
+        '<div style="padding:4px 8px;font-size:12px;font-weight:bold;white-space:nowrap;">🎓 순천향대학교</div>',
+    });
+    infoWindow.open(map, schMarker);
+
+    // Click to get coordinates
+    window.kakao.maps.event.addListener(map, "click", (mouseEvent: any) => {
+      const latlng = mouseEvent.latLng;
+      onMapClick(latlng.getLat(), latlng.getLng());
+    });
+  }, [mapLoaded, onMapClick]);
+
+  // Update markers when restaurants change
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+    const map = mapInstanceRef.current;
+
+    // Remove existing markers
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = [];
+
+    restaurants.forEach((r) => {
+      const category = CATEGORIES.find((c) => c.value === r.category);
+      const emoji = category?.emoji || "📍";
+      const isSelected = r.id === selectedId;
+
+      const content = document.createElement("div");
+      content.innerHTML = `
+        <div style="
+          cursor:pointer;
+          display:flex;
+          align-items:center;
+          gap:4px;
+          background:${isSelected ? "#4F46E5" : "white"};
+          color:${isSelected ? "white" : "#1f2937"};
+          padding:6px 10px;
+          border-radius:20px;
+          box-shadow:0 2px 8px rgba(0,0,0,0.15);
+          font-size:13px;
+          font-weight:600;
+          white-space:nowrap;
+          border:2px solid ${isSelected ? "#4F46E5" : "#e5e7eb"};
+          transition:all 0.2s;
+        ">
+          <span style="font-size:16px;">${emoji}</span>
+          <span>${r.name}</span>
+          ${r.avgRating > 0 ? `<span style="color:${isSelected ? "#fde68a" : "#f59e0b"};font-size:11px;">★${r.avgRating}</span>` : ""}
+        </div>
+      `;
+
+      const overlay = new window.kakao.maps.CustomOverlay({
+        position: new window.kakao.maps.LatLng(r.lat, r.lng),
+        content,
+        yAnchor: 1.3,
+        map,
+      });
+
+      content.onclick = () => onSelect(r);
+      markersRef.current.push(overlay);
+    });
+  }, [restaurants, selectedId, mapLoaded, onSelect]);
+
+  // Pan to selected restaurant
+  useEffect(() => {
+    if (!mapInstanceRef.current || !selectedId) return;
+    const r = restaurants.find((r) => r.id === selectedId);
+    if (r) {
+      mapInstanceRef.current.panTo(
+        new window.kakao.maps.LatLng(r.lat, r.lng)
+      );
+    }
+  }, [selectedId, restaurants]);
+
+  return (
+    <div ref={mapRef} className="w-full h-full rounded-2xl overflow-hidden" />
+  );
+}
