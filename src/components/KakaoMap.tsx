@@ -34,14 +34,19 @@ export default function KakaoMap({
   // Load Kakao Maps SDK
   useEffect(() => {
     if (window.kakao?.maps) {
-      setMapLoaded(true);
+      window.kakao.maps.load(() => setMapLoaded(true));
       return;
     }
 
     const script = document.createElement("script");
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`;
+    script.onerror = () => {
+      console.error("카카오맵 SDK 로드 실패. API 키와 도메인 설정을 확인하세요.");
+    };
     script.onload = () => {
-      window.kakao.maps.load(() => setMapLoaded(true));
+      if (window.kakao?.maps) {
+        window.kakao.maps.load(() => setMapLoaded(true));
+      }
     };
     document.head.appendChild(script);
   }, []);

@@ -3,7 +3,7 @@
 import type { Restaurant } from "@/types";
 import { CATEGORIES } from "@/types";
 import { useState } from "react";
-import StarRating from "./StarRating";
+import AdminToggle from "./AdminToggle";
 
 interface Props {
   restaurants: Restaurant[];
@@ -11,6 +11,8 @@ interface Props {
   onSelect: (restaurant: Restaurant) => void;
   filterCategory: string;
   onFilterChange: (category: string) => void;
+  isAdmin: boolean;
+  onAdminToggle: (isAdmin: boolean) => void;
 }
 
 export default function Sidebar({
@@ -19,6 +21,8 @@ export default function Sidebar({
   onSelect,
   filterCategory,
   onFilterChange,
+  isAdmin,
+  onAdminToggle,
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -31,9 +35,12 @@ export default function Sidebar({
     <div className="w-80 bg-white/95 backdrop-blur-xl flex flex-col border-r border-gray-100 z-10">
       {/* Header */}
       <div className="p-5 border-b border-gray-100">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-2xl">🗺️</span>
-          <h1 className="text-lg font-bold text-gray-900">SCH 맛집 지도</h1>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🗺️</span>
+            <h1 className="text-lg font-bold text-gray-900">SCH 맛집 지도</h1>
+          </div>
+          <AdminToggle isAdmin={isAdmin} onToggle={onAdminToggle} />
         </div>
         <p className="text-xs text-gray-400 ml-9">순천향대 근처 맛집 리뷰</p>
       </div>
@@ -99,9 +106,11 @@ export default function Sidebar({
           <div className="text-center py-12">
             <p className="text-3xl mb-2">🍽️</p>
             <p className="text-sm text-gray-400">등록된 음식점이 없어요</p>
-            <p className="text-xs text-gray-300 mt-1">
-              지도를 클릭해서 등록해보세요!
-            </p>
+            {isAdmin && (
+              <p className="text-xs text-gray-300 mt-1">
+                지도를 클릭해서 등록해보세요!
+              </p>
+            )}
           </div>
         ) : (
           <div className="p-2">
@@ -132,9 +141,6 @@ export default function Sidebar({
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 truncate mt-0.5">
-                        {r.address}
-                      </p>
                       <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-xs text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">
                           {cat?.label}
@@ -155,7 +161,9 @@ export default function Sidebar({
       {/* Footer hint */}
       <div className="p-4 border-t border-gray-100">
         <p className="text-xs text-gray-300 text-center">
-          💡 지도를 클릭하면 음식점을 등록할 수 있어요
+          {isAdmin
+            ? "💡 지도를 클릭하면 음식점을 등록할 수 있어요"
+            : "💡 음식점을 선택하면 리뷰를 볼 수 있어요"}
         </p>
       </div>
     </div>

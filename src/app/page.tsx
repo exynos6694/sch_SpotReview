@@ -14,6 +14,7 @@ export default function Home() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [addModal, setAddModal] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   async function loadRestaurants() {
     const data = await getRestaurants();
@@ -25,9 +26,14 @@ export default function Home() {
     loadRestaurants();
   }, []);
 
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    setAddModal({ lat, lng });
-  }, []);
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => {
+      if (isAdmin) {
+        setAddModal({ lat, lng });
+      }
+    },
+    [isAdmin]
+  );
 
   const handleSelect = useCallback((restaurant: Restaurant) => {
     setSelectedRestaurant(restaurant);
@@ -46,6 +52,8 @@ export default function Home() {
         onSelect={handleSelect}
         filterCategory={filterCategory}
         onFilterChange={setFilterCategory}
+        isAdmin={isAdmin}
+        onAdminToggle={setIsAdmin}
       />
 
       {/* Map Area */}
@@ -72,12 +80,13 @@ export default function Home() {
             restaurant={selectedRestaurant}
             onClose={() => setSelectedRestaurant(null)}
             onUpdate={loadRestaurants}
+            isAdmin={isAdmin}
           />
         )}
       </div>
 
-      {/* Add Restaurant Modal */}
-      {addModal && (
+      {/* Add Restaurant Modal (admin only) */}
+      {addModal && isAdmin && (
         <AddRestaurantModal
           lat={addModal.lat}
           lng={addModal.lng}

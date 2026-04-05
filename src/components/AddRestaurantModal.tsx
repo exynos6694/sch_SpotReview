@@ -14,13 +14,12 @@ interface Props {
 export default function AddRestaurantModal({ lat, lng, onClose, onAdded }: Props) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("korean");
-  const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !address.trim()) return;
+    if (!name.trim()) return;
 
     setSubmitting(true);
     await addRestaurant({
@@ -28,7 +27,7 @@ export default function AddRestaurantModal({ lat, lng, onClose, onAdded }: Props
       category,
       lat,
       lng,
-      address: address.trim(),
+      address: "",
       description: description.trim(),
     });
     setSubmitting(false);
@@ -94,20 +93,6 @@ export default function AddRestaurantModal({ lat, lng, onClose, onAdded }: Props
                 </button>
               ))}
             </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">
-              주소 *
-            </label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="예: 아산시 신창면 순천향로 22"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 placeholder-gray-400"
-              required
-            />
           </div>
 
           <div>

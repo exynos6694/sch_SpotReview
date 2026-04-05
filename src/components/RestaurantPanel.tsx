@@ -3,16 +3,19 @@
 import { useState, useEffect } from "react";
 import type { Restaurant, Review } from "@/types";
 import { CATEGORIES } from "@/types";
-import { getReviews, addReview } from "@/lib/firestore";
+import { getReviews, addReview, deleteReview } from "@/lib/firestore";
+import { deleteDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import StarRating from "./StarRating";
 
 interface Props {
   restaurant: Restaurant;
   onClose: () => void;
   onUpdate: () => void;
+  isAdmin: boolean;
 }
 
-export default function RestaurantPanel({ restaurant, onClose, onUpdate }: Props) {
+export default function RestaurantPanel({ restaurant, onClose, onUpdate, isAdmin }: Props) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -20,6 +23,7 @@ export default function RestaurantPanel({ restaurant, onClose, onUpdate }: Props
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const category = CATEGORIES.find((c) => c.value === restaurant.category);
 
@@ -55,6 +59,27 @@ export default function RestaurantPanel({ restaurant, onClose, onUpdate }: Props
     onUpdate();
   }
 
+  async function handleDeleteRestaurant() {
+    if (!confirm("정말 이 음식점을 삭제하시겠습니까?")) return;
+    setDeleting(true);
+    // Delete all reviews first
+    for (const review of reviews) {
+      await deleteDoc(doc(db, "reviews", review.id));
+    }
+    // Delete restaurant
+    await deleteDoc(doc(db, "restaurants", restaurant.id));
+    setDeleting(false);
+    onClose();
+    onUpdate();
+  }
+
+  async function handleDeleteReview(reviewId: string) {
+    if (!confirm("이 리뷰를 삭제하시겠습니까?")) return;
+    await deleteReview(reviewId, restaurant.id);
+    await loadReviews();
+    onUpdate();
+  }
+
   return (
     <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl z-20 flex flex-col border-l border-gray-100 animate-slide-in">
       {/* Header */}
@@ -70,7 +95,6 @@ export default function RestaurantPanel({ restaurant, onClose, onUpdate }: Props
             <h2 className="text-xl font-bold text-gray-900 mt-2">
               {restaurant.name}
             </h2>
-            <p className="text-sm text-gray-500 mt-1">{restaurant.address}</p>
             {restaurant.description && (
               <p className="text-sm text-gray-600 mt-2">{restaurant.description}</p>
             )}
@@ -100,6 +124,17 @@ export default function RestaurantPanel({ restaurant, onClose, onUpdate }: Props
             </p>
           </div>
         </div>
+
+        {/* Admin: Delete Restaurant */}
+        {isAdmin && (
+          <button
+            onClick={handleDeleteRestaurant}
+            disabled={deleting}
+            className="w-full mt-3 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-50"
+          >
+            {deleting ? "삭제 중..." : "🗑️ 음식점 삭제"}
+          </button>
+        )}
       </div>
 
       {/* Reviews */}
@@ -174,9 +209,19 @@ export default function RestaurantPanel({ restaurant, onClose, onUpdate }: Props
                   <span className="font-medium text-sm text-gray-900">
                     {review.author}
                   </span>
-                  <span className="text-xs text-gray-400">
-                    {review.createdAt.toLocaleDateString("ko-KR")}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">
+                      {review.createdAt.toLocaleDateString("ko-KR")}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteReview(review.id)}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <StarRating rating={review.rating} readonly size="sm" />
                 <p className="text-sm text-gray-600 mt-2 leading-relaxed">
