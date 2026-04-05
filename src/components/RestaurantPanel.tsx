@@ -15,10 +15,9 @@ interface Props {
   isAdmin: boolean;
 }
 
-// Snap points as percentage of viewport height from bottom
-const SNAP_HALF = 0.45;
-const SNAP_FULL = 1.0;
-const SNAP_CLOSED = 0;
+// Snap points in px from viewport bottom (computed at runtime)
+const SNAP_RATIO_HALF = 0.45;
+const SNAP_RATIO_FULL = 1.0;
 
 export default function RestaurantPanel({
   restaurant,
@@ -35,26 +34,121 @@ export default function RestaurantPanel({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Bottom sheet state
-  const [sheetHeight, setSheetHeight] = useState(SNAP_HALF);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const dragStartY = useRef(0);
-  const dragStartHeight = useRef(0);
+  // --- Bottom sheet state (refs for 60fps) ---
   const sheetRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
+  const dragHandleBarRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const hintRef = useRef<HTMLDivElement>(null);
+  const reviewSectionRef = useRef<HTMLDivElement>(null);
+
+  // Current translateY value (0 = full screen, vh - snapHalf = half)
+  const currentY = useRef(0);
+  const snapHalf = useRef(0);
+  const snapFull = useRef(0); // always 0 (top of screen)
+  const vh = useRef(0);
+
+  const isDragging = useRef(false);
+  const dragStartY = useRef(0);
+  const dragStartTranslate = useRef(0);
+  const lastMoveTime = useRef(0);
+  const lastMoveY = useRef(0);
+  const velocity = useRef(0);
+
+  // For React re-renders (only used for expanded state UI toggles)
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const category = CATEGORIES.find((c) => c.value === restaurant.category);
 
+  // Compute snap points
   useEffect(() => {
-    loadReviews();
-    // Animate in
-    setSheetHeight(0);
+    vh.current = window.innerHeight;
+    snapHalf.current = vh.current * (1 - SNAP_RATIO_HALF);
+    snapFull.current = 0;
+  }, []);
+
+  // Apply transform directly to DOM (no React re-render)
+  const applyTransform = useCallback((y: number, animate: boolean) => {
+    const sheet = sheetRef.current;
+    const backdrop = backdropRef.current;
+    if (!sheet || !backdrop) return;
+
+    if (animate) {
+      sheet.style.transition = "transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1)";
+      backdrop.style.transition = "opacity 0.4s cubic-bezier(0.2, 0.9, 0.3, 1)";
+    } else {
+      sheet.style.transition = "none";
+      backdrop.style.transition = "none";
+    }
+
+    sheet.style.transform = `translateY(${y}px)`;
+
+    // Backdrop opacity: 0 at bottom, 0.4 at top
+    const progress = 1 - y / vh.current;
+    backdrop.style.opacity = `${Math.min(progress * 0.5, 0.4)}`;
+
+    // Border radius: 24px at half, 0 at full
+    const expanded = y < snapHalf.current * 0.5;
+    const radius = expanded
+      ? Math.max(0, Math.round((y / (snapHalf.current * 0.5)) * 24))
+      : 24;
+    sheet.style.borderTopLeftRadius = `${radius}px`;
+    sheet.style.borderTopRightRadius = `${radius}px`;
+
+    // Toggle expanded UI elements
+    const bar = dragHandleBarRef.current;
+    const header = headerRef.current;
+    const hint = hintRef.current;
+    const reviewSection = reviewSectionRef.current;
+
+    if (bar) bar.style.opacity = expanded ? "0" : "1";
+    if (header) header.style.opacity = expanded ? "1" : "0";
+    if (header) header.style.pointerEvents = expanded ? "auto" : "none";
+    if (hint) hint.style.display = expanded ? "none" : "";
+    if (reviewSection) {
+      reviewSection.style.opacity = expanded ? "1" : "0";
+      reviewSection.style.pointerEvents = expanded ? "auto" : "none";
+    }
+
+    currentY.current = y;
+  }, []);
+
+  // Snap to a position
+  const snapTo = useCallback(
+    (targetY: number, shouldClose?: boolean) => {
+      applyTransform(targetY, true);
+
+      const expanded = targetY < snapHalf.current * 0.5;
+      setIsExpanded(expanded);
+
+      if (shouldClose) {
+        setTimeout(onClose, 400);
+      }
+    },
+    [applyTransform, onClose]
+  );
+
+  // Initial animate-in
+  useEffect(() => {
+    vh.current = window.innerHeight;
+    snapHalf.current = vh.current * (1 - SNAP_RATIO_HALF);
+
+    // Start off-screen
+    applyTransform(vh.current, false);
+
+    // Animate to half
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setSheetHeight(SNAP_HALF);
+        snapTo(snapHalf.current);
       });
     });
+  }, [restaurant.id, applyTransform, snapTo]);
+
+  // Load reviews
+  useEffect(() => {
+    loadReviews();
   }, [restaurant.id]);
 
   async function loadReviews() {
@@ -67,7 +161,6 @@ export default function RestaurantPanel({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!author.trim() || !content.trim()) return;
-
     setSubmitting(true);
     await addReview({
       restaurantId: restaurant.id,
@@ -75,7 +168,6 @@ export default function RestaurantPanel({
       rating,
       content: content.trim(),
     });
-
     setAuthor("");
     setRating(5);
     setContent("");
@@ -105,96 +197,101 @@ export default function RestaurantPanel({
   }
 
   function handleClose() {
-    setIsClosing(true);
-    setSheetHeight(0);
-    setTimeout(onClose, 300);
+    snapTo(vh.current, true);
   }
 
-  // Snap to nearest point
-  const snapTo = useCallback((height: number) => {
-    if (height < 0.2) {
-      // Close
-      setIsClosing(true);
-      setSheetHeight(0);
-      setTimeout(onClose, 300);
-    } else if (height < 0.7) {
-      setSheetHeight(SNAP_HALF);
-    } else {
-      setSheetHeight(SNAP_FULL);
+  // --- Touch / Mouse drag handlers ---
+  const onDragStart = useCallback((clientY: number) => {
+    // If content is scrolled down and we're expanded, don't drag
+    const el = contentRef.current;
+    const expanded = currentY.current < snapHalf.current * 0.5;
+    if (el && el.scrollTop > 0 && expanded) return;
+
+    isDragging.current = true;
+    dragStartY.current = clientY;
+    dragStartTranslate.current = currentY.current;
+    velocity.current = 0;
+    lastMoveTime.current = Date.now();
+    lastMoveY.current = clientY;
+  }, []);
+
+  const onDragMove = useCallback(
+    (clientY: number) => {
+      if (!isDragging.current) return;
+
+      const delta = clientY - dragStartY.current;
+      const newY = Math.max(0, Math.min(vh.current, dragStartTranslate.current + delta));
+
+      applyTransform(newY, false);
+
+      // Track velocity
+      const now = Date.now();
+      const dt = now - lastMoveTime.current;
+      if (dt > 0) {
+        velocity.current = (clientY - lastMoveY.current) / dt;
+      }
+      lastMoveTime.current = now;
+      lastMoveY.current = clientY;
+    },
+    [applyTransform]
+  );
+
+  const onDragEnd = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+
+    const y = currentY.current;
+    const v = velocity.current; // px/ms, positive = downward
+
+    // Fling detection
+    if (Math.abs(v) > 0.5) {
+      if (v > 0) {
+        // Fling down
+        if (y > snapHalf.current * 0.7) {
+          snapTo(vh.current, true); // close
+        } else {
+          snapTo(snapHalf.current);
+        }
+      } else {
+        // Fling up
+        if (y < snapHalf.current) {
+          snapTo(snapFull.current);
+        } else {
+          snapTo(snapHalf.current);
+        }
+      }
+      return;
     }
-  }, [onClose]);
 
-  // Touch handlers for drag
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      // If scrollable content is scrolled, don't start drag
-      const el = contentRef.current;
-      if (el && el.scrollTop > 0 && sheetHeight >= SNAP_FULL) return;
+    // Position-based snap
+    const midClose = (snapHalf.current + vh.current) / 2;
+    const midExpand = snapHalf.current / 2;
 
-      setIsDragging(true);
-      dragStartY.current = e.touches[0].clientY;
-      dragStartHeight.current = sheetHeight;
-    },
-    [sheetHeight]
-  );
+    if (y > midClose) {
+      snapTo(vh.current, true);
+    } else if (y > midExpand) {
+      snapTo(snapHalf.current);
+    } else {
+      snapTo(snapFull.current);
+    }
+  }, [snapTo]);
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (!isDragging) return;
-      const deltaY = dragStartY.current - e.touches[0].clientY;
-      const deltaHeight = deltaY / window.innerHeight;
-      const newHeight = Math.max(0, Math.min(SNAP_FULL, dragStartHeight.current + deltaHeight));
-      setSheetHeight(newHeight);
-    },
-    [isDragging]
-  );
-
-  const handleTouchEnd = useCallback(() => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    snapTo(sheetHeight);
-  }, [isDragging, sheetHeight, snapTo]);
-
-  // Mouse handlers for desktop drag
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      setIsDragging(true);
-      dragStartY.current = e.clientY;
-      dragStartHeight.current = sheetHeight;
-      e.preventDefault();
-    },
-    [sheetHeight]
-  );
-
+  // Global mouse events for desktop drag
   useEffect(() => {
-    if (!isDragging) return;
+    const onMouseMove = (e: MouseEvent) => onDragMove(e.clientY);
+    const onMouseUp = () => onDragEnd();
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaY = dragStartY.current - e.clientY;
-      const deltaHeight = deltaY / window.innerHeight;
-      const newHeight = Math.max(0, Math.min(SNAP_FULL, dragStartHeight.current + deltaHeight));
-      setSheetHeight(newHeight);
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      snapTo(sheetHeight);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
     };
-  }, [isDragging, sheetHeight, snapTo]);
+  }, [onDragMove, onDragEnd]);
 
-  const isExpanded = sheetHeight > 0.7;
-
-  // --- Desktop panel (keep original right-side behavior) ---
+  // --- Desktop panel ---
   const desktopPanel = (
     <div className="hidden md:flex absolute right-0 top-0 bottom-0 w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl z-20 flex-col border-l border-gray-100 animate-slide-in">
-      {/* Header */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -208,32 +305,15 @@ export default function RestaurantPanel({
               {restaurant.name}
             </h2>
             {restaurant.description && (
-              <p className="text-sm text-gray-600 mt-2">
-                {restaurant.description}
-              </p>
+              <p className="text-sm text-gray-600 mt-2">{restaurant.description}</p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <svg
-              className="w-5 h-5 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-
-        {/* Rating Summary */}
         <div className="flex items-center gap-4 mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl">
           <div className="text-center">
             <div className="text-3xl font-bold text-amber-600">
@@ -243,12 +323,9 @@ export default function RestaurantPanel({
           </div>
           <div className="flex-1">
             <StarRating rating={restaurant.avgRating} readonly size="lg" />
-            <p className="text-xs text-gray-500 mt-1">
-              리뷰 {restaurant.reviewCount}개
-            </p>
+            <p className="text-xs text-gray-500 mt-1">리뷰 {restaurant.reviewCount}개</p>
           </div>
         </div>
-
         {isAdmin && (
           <button
             onClick={handleDeleteRestaurant}
@@ -259,187 +336,147 @@ export default function RestaurantPanel({
           </button>
         )}
       </div>
-
-      {/* Reviews */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {renderReviews()}
-      </div>
+      <div className="flex-1 overflow-y-auto p-6">{renderReviews()}</div>
     </div>
   );
 
-  // Border radius decreases as sheet expands toward full
-  const borderRadius = isExpanded
-    ? Math.max(0, Math.round((1 - (sheetHeight - 0.7) / 0.3) * 24))
-    : 24;
-
   // --- Mobile bottom sheet ---
   const mobileSheet = (
-    <div className="md:hidden fixed inset-0 z-50 pointer-events-none">
+    <div className="md:hidden fixed inset-0 z-50" style={{ touchAction: "none" }}>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 pointer-events-auto"
-        style={{
-          opacity: Math.min(sheetHeight * 0.6, 0.4),
-          background: "black",
-          transition: isDragging ? "none" : "opacity 0.3s",
-        }}
+        ref={backdropRef}
+        className="absolute inset-0 bg-black"
+        style={{ opacity: 0 }}
         onClick={handleClose}
       />
 
-      {/* Sheet */}
+      {/* Sheet - full height, positioned via translateY */}
       <div
         ref={sheetRef}
-        className="absolute left-0 right-0 bottom-0 pointer-events-auto bg-white shadow-2xl flex flex-col"
+        className="absolute left-0 right-0 bottom-0 bg-white shadow-2xl flex flex-col will-change-transform"
         style={{
-          height: `${sheetHeight * 100}vh`,
-          transition: isDragging
-            ? "none"
-            : "height 0.35s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
-          maxHeight: "100vh",
-          borderTopLeftRadius: `${borderRadius}px`,
-          borderTopRightRadius: `${borderRadius}px`,
+          height: "100vh",
+          transform: `translateY(${vh.current || window.innerHeight}px)`,
+          borderTopLeftRadius: "24px",
+          borderTopRightRadius: "24px",
         }}
       >
-        {/* Top bar: drag handle + back button when expanded */}
+        {/* Drag handle zone */}
         <div
-          className="flex-shrink-0 cursor-grab active:cursor-grabbing"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onMouseDown={handleMouseDown}
-          style={{
-            paddingTop: isExpanded
-              ? "max(env(safe-area-inset-top, 12px), 12px)"
-              : "12px",
-            transition: isDragging ? "none" : "padding 0.35s",
+          ref={handleRef}
+          className="flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+          style={{ paddingTop: "12px" }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            onDragStart(e.touches[0].clientY);
+          }}
+          onTouchMove={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onDragMove(e.touches[0].clientY);
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            onDragEnd();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onDragStart(e.clientY);
           }}
         >
-          {/* Drag handle - fades out when fully expanded */}
+          {/* Drag bar */}
           <div
+            ref={dragHandleBarRef}
             className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-1"
-            style={{
-              opacity: isExpanded ? 0 : 1,
-              transition: "opacity 0.2s",
-            }}
+            style={{ transition: "opacity 0.2s" }}
           />
 
-          {/* Sticky header when fully expanded */}
-          {isExpanded && (
-            <div className="flex items-center gap-3 px-4 pb-2">
-              <button
-                onClick={handleClose}
-                className="p-1.5 -ml-1.5 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <svg
-                  className="w-5 h-5 text-gray-700"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-              <h2 className="text-sm font-bold text-gray-900 truncate flex-1">
-                {restaurant.name}
-              </h2>
-            </div>
-          )}
+          {/* Expanded sticky header */}
+          <div
+            ref={headerRef}
+            className="flex items-center gap-3 px-4 pb-2"
+            style={{ opacity: 0, pointerEvents: "none", transition: "opacity 0.2s" }}
+          >
+            <button
+              onClick={handleClose}
+              className="p-1.5 -ml-1.5 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h2 className="text-sm font-bold text-gray-900 truncate flex-1">
+              {restaurant.name}
+            </h2>
+          </div>
         </div>
 
-        {/* Scrollable content area */}
+        {/* Scrollable content */}
         <div
           ref={contentRef}
           className="flex-1 overflow-y-auto overscroll-contain"
           onTouchStart={(e) => {
-            // Allow drag from scrollable area when at top
-            if (contentRef.current && contentRef.current.scrollTop <= 0) {
-              handleTouchStart(e);
+            e.stopPropagation();
+            const el = contentRef.current;
+            const expanded = currentY.current < snapHalf.current * 0.5;
+            if (!el || !expanded || el.scrollTop <= 0) {
+              onDragStart(e.touches[0].clientY);
             }
           }}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          onTouchMove={(e) => {
+            e.stopPropagation();
+            if (isDragging.current) {
+              e.preventDefault();
+              onDragMove(e.touches[0].clientY);
+            }
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            onDragEnd();
+          }}
         >
           {/* Restaurant info */}
           <div className="px-5 pb-4">
-            {!isExpanded && (
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{category?.emoji}</span>
-                    <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                      {category?.label}
-                    </span>
-                  </div>
-                  <h2 className="text-lg font-bold text-gray-900 mt-2 truncate">
-                    {restaurant.name}
-                  </h2>
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{category?.emoji}</span>
+                  <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                    {category?.label}
+                  </span>
                 </div>
+                <h2 className="text-lg font-bold text-gray-900 mt-2 truncate">
+                  {restaurant.name}
+                </h2>
+              </div>
+              {!isExpanded && (
                 <button
                   onClick={handleClose}
                   className="p-2 -mr-2 hover:bg-gray-100 rounded-xl transition-colors"
                 >
-                  <svg
-                    className="w-5 h-5 text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-              </div>
-            )}
-
-            {isExpanded && (
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-2xl">{category?.emoji}</span>
-                <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                  {category?.label}
-                </span>
-              </div>
-            )}
-
-            {isExpanded && (
-              <h2 className="text-xl font-bold text-gray-900 mt-1">
-                {restaurant.name}
-              </h2>
-            )}
+              )}
+            </div>
 
             {restaurant.description && (
-              <p
-                className={`text-sm text-gray-500 mt-1 ${
-                  isExpanded ? "" : "line-clamp-2"
-                }`}
-              >
-                {restaurant.description}
-              </p>
+              <p className="text-sm text-gray-500 mt-1">{restaurant.description}</p>
             )}
 
-            {/* Rating Summary */}
+            {/* Rating */}
             <div className="flex items-center gap-4 mt-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl">
               <div className="text-center">
                 <div className="text-2xl font-bold text-amber-600">
                   {restaurant.avgRating > 0 ? restaurant.avgRating : "-"}
                 </div>
-                <div className="text-[10px] text-amber-600/70 font-medium">
-                  평점
-                </div>
+                <div className="text-[10px] text-amber-600/70 font-medium">평점</div>
               </div>
               <div className="flex-1">
                 <StarRating rating={restaurant.avgRating} readonly size="md" />
-                <p className="text-xs text-gray-500 mt-1">
-                  리뷰 {restaurant.reviewCount}개
-                </p>
+                <p className="text-xs text-gray-500 mt-1">리뷰 {restaurant.reviewCount}개</p>
               </div>
             </div>
 
@@ -454,40 +491,24 @@ export default function RestaurantPanel({
             )}
 
             {/* Expand hint */}
-            {!isExpanded && (
-              <div className="flex items-center justify-center gap-1 mt-3 text-xs text-gray-400">
-                <svg
-                  className="w-4 h-4 animate-bounce"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-                위로 밀어서 리뷰 보기
-              </div>
-            )}
+            <div
+              ref={hintRef}
+              className="flex items-center justify-center gap-1 mt-3 text-xs text-gray-400"
+            >
+              <svg className="w-4 h-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+              위로 밀어서 리뷰 보기
+            </div>
           </div>
 
           {/* Reviews section */}
           <div
-            style={{
-              opacity: isExpanded ? 1 : 0,
-              maxHeight: isExpanded ? "none" : "0px",
-              overflow: isExpanded ? "visible" : "hidden",
-              transition: "opacity 0.25s ease",
-            }}
+            ref={reviewSectionRef}
+            style={{ opacity: 0, pointerEvents: "none", transition: "opacity 0.25s" }}
           >
             <div className="border-t border-gray-100" />
-            <div className="px-5 py-4">
-              {renderReviews()}
-            </div>
-            {/* Safe area bottom padding */}
+            <div className="px-5 py-4">{renderReviews()}</div>
             <div className="h-[env(safe-area-inset-bottom,0px)]" />
           </div>
         </div>
@@ -508,12 +529,8 @@ export default function RestaurantPanel({
           </button>
         </div>
 
-        {/* Review Form */}
         {showForm && (
-          <form
-            onSubmit={handleSubmit}
-            className="mb-6 p-4 bg-gray-50 rounded-xl space-y-3"
-          >
+          <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 rounded-xl space-y-3">
             <input
               type="text"
               placeholder="닉네임"
@@ -523,9 +540,7 @@ export default function RestaurantPanel({
               required
             />
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">
-                평점
-              </label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">평점</label>
               <StarRating rating={rating} onChange={setRating} size="lg" />
             </div>
             <textarea
@@ -546,7 +561,6 @@ export default function RestaurantPanel({
           </form>
         )}
 
-        {/* Review List */}
         {loading ? (
           <div className="text-center py-8 text-gray-400">
             <div className="animate-spin w-6 h-6 border-2 border-indigo-300 border-t-indigo-600 rounded-full mx-auto" />
@@ -555,21 +569,14 @@ export default function RestaurantPanel({
           <div className="text-center py-12">
             <p className="text-4xl mb-2">📝</p>
             <p className="text-gray-400 text-sm">아직 리뷰가 없어요</p>
-            <p className="text-gray-400 text-xs mt-1">
-              첫 번째 리뷰를 남겨보세요!
-            </p>
+            <p className="text-gray-400 text-xs mt-1">첫 번째 리뷰를 남겨보세요!</p>
           </div>
         ) : (
           <div className="space-y-3">
             {reviews.map((review) => (
-              <div
-                key={review.id}
-                className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-              >
+              <div key={review.id} className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm text-gray-900">
-                    {review.author}
-                  </span>
+                  <span className="font-medium text-sm text-gray-900">{review.author}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-400">
                       {review.createdAt.toLocaleDateString("ko-KR")}
@@ -585,9 +592,7 @@ export default function RestaurantPanel({
                   </div>
                 </div>
                 <StarRating rating={review.rating} readonly size="sm" />
-                <p className="text-sm text-gray-600 mt-2 leading-relaxed">
-                  {review.content}
-                </p>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">{review.content}</p>
               </div>
             ))}
           </div>
