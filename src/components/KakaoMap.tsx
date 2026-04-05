@@ -101,27 +101,28 @@ export default function KakaoMap({
       const emoji = category?.emoji || "📍";
       const isSelected = r.id === selectedId;
 
+      const isMobile = window.innerWidth < 768;
       const content = document.createElement("div");
       content.innerHTML = `
         <div style="
           cursor:pointer;
           display:flex;
           align-items:center;
-          gap:4px;
+          gap:${isMobile ? "2px" : "4px"};
           background:${isSelected ? "#4F46E5" : "white"};
           color:${isSelected ? "white" : "#1f2937"};
-          padding:6px 10px;
-          border-radius:20px;
+          padding:${isMobile ? "3px 6px" : "6px 10px"};
+          border-radius:${isMobile ? "12px" : "20px"};
           box-shadow:0 2px 8px rgba(0,0,0,0.15);
-          font-size:13px;
+          font-size:${isMobile ? "10px" : "13px"};
           font-weight:600;
           white-space:nowrap;
-          border:2px solid ${isSelected ? "#4F46E5" : "#e5e7eb"};
+          border:${isMobile ? "1.5px" : "2px"} solid ${isSelected ? "#4F46E5" : "#e5e7eb"};
           transition:all 0.2s;
         ">
-          <span style="font-size:16px;">${emoji}</span>
+          <span style="font-size:${isMobile ? "12px" : "16px"};">${emoji}</span>
           <span>${r.name}</span>
-          ${r.avgRating > 0 ? `<span style="color:${isSelected ? "#fde68a" : "#f59e0b"};font-size:11px;">★${r.avgRating}</span>` : ""}
+          ${r.avgRating > 0 ? `<span style="color:${isSelected ? "#fde68a" : "#f59e0b"};font-size:${isMobile ? "9px" : "11px"};">★${r.avgRating}</span>` : ""}
         </div>
       `;
 
