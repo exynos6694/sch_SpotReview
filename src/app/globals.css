@@ -49,6 +49,44 @@ body {
   animation: scale-in 0.2s ease-out;
 }
 
+/* Slot machine animations */
+@keyframes slot-blur {
+  0%, 100% { filter: blur(0px); }
+  50% { filter: blur(1px); }
+}
+
+@keyframes slot-reveal {
+  0% { transform: scale(0.9); opacity: 0.5; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slot-shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slot-blur {
+  animation: slot-blur 0.15s infinite;
+}
+
+.animate-slot-reveal {
+  animation: slot-reveal 0.4s ease-out;
+}
+
+.animate-slot-shine {
+  animation: slot-shine 0.6s ease-out 0.2s;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

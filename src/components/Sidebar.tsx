@@ -3,6 +3,7 @@
 import type { Restaurant } from "@/types";
 import { CATEGORIES } from "@/types";
 import { useState } from "react";
+import Link from "next/link";
 import AdminToggle from "./AdminToggle";
 
 interface Props {
@@ -160,17 +161,12 @@ export default function Sidebar({
 
       {/* Random Pick & Footer */}
       <div className="p-4 border-t border-gray-100">
-        {filtered.length > 0 && (
-          <button
-            onClick={() => {
-              const random = filtered[Math.floor(Math.random() * filtered.length)];
-              onSelect(random);
-            }}
-            className="w-full mb-3 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl text-sm font-semibold hover:from-indigo-600 hover:to-purple-600 transition-all active:scale-95"
-          >
-            🎲 랜덤 맛집 뽑기
-          </button>
-        )}
+        <Link
+          href="/random"
+          className="block w-full mb-3 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl text-sm font-semibold hover:from-indigo-600 hover:to-purple-600 transition-all active:scale-95 text-center"
+        >
+          🎲 랜덤 식당 뽑기
+        </Link>
         <p className="text-xs text-gray-300 text-center">
           {isAdmin
             ? "💡 지도를 클릭하면 음식점을 등록할 수 있어요"

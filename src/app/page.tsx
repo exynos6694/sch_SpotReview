@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import KakaoMap from "@/components/KakaoMap";
 import Sidebar from "@/components/Sidebar";
 import RestaurantPanel from "@/components/RestaurantPanel";
@@ -22,6 +22,14 @@ export default function Home() {
     const data = await getRestaurants();
     setRestaurants(data);
     setLoading(false);
+
+    // Auto-select restaurant from query param (e.g. from random page)
+    const params = new URLSearchParams(window.location.search);
+    const selectedId = params.get("selected");
+    if (selectedId) {
+      const found = data.find((r) => r.id === selectedId);
+      if (found) setSelectedRestaurant(found);
+    }
   }
 
   useEffect(() => {
