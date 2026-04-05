@@ -32,9 +32,9 @@ export default function Sidebar({
     .sort((a, b) => b.avgRating - a.avgRating);
 
   return (
-    <div className="w-80 bg-white/95 backdrop-blur-xl flex flex-col border-r border-gray-100 z-10">
-      {/* Header */}
-      <div className="p-5 border-b border-gray-100">
+    <div className="w-80 bg-white/95 backdrop-blur-xl flex flex-col border-r border-gray-100 z-10 h-full">
+      {/* Header - hidden on mobile (mobile has its own header) */}
+      <div className="hidden md:block p-5 border-b border-gray-100">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🗺️</span>

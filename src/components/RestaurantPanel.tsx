@@ -81,7 +81,7 @@ export default function RestaurantPanel({ restaurant, onClose, onUpdate, isAdmin
   }
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl z-20 flex flex-col border-l border-gray-100 animate-slide-in">
+    <div className="absolute inset-0 md:left-auto md:right-0 md:top-0 md:bottom-0 md:w-full md:max-w-md bg-white/95 backdrop-blur-xl shadow-2xl z-20 flex flex-col border-l border-gray-100 animate-slide-in">
       {/* Header */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-start justify-between">

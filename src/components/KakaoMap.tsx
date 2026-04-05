@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { Restaurant } from "@/types";
 import { CATEGORIES } from "@/types";
 
@@ -29,7 +29,13 @@ export default function KakaoMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const onMapClickRef = useRef(onMapClick);
   const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Keep ref in sync with latest callback
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
 
   // Load Kakao Maps SDK
   useEffect(() => {
@@ -74,12 +80,12 @@ export default function KakaoMap({
     });
     infoWindow.open(map, schMarker);
 
-    // Click to get coordinates
+    // Click to get coordinates - use ref to always get latest callback
     window.kakao.maps.event.addListener(map, "click", (mouseEvent: any) => {
       const latlng = mouseEvent.latLng;
-      onMapClick(latlng.getLat(), latlng.getLng());
+      onMapClickRef.current(latlng.getLat(), latlng.getLng());
     });
-  }, [mapLoaded, onMapClick]);
+  }, [mapLoaded]);
 
   // Update markers when restaurants change
   useEffect(() => {
