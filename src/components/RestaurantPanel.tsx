@@ -289,6 +289,39 @@ export default function RestaurantPanel({
     };
   }, [onDragMove, onDragEnd]);
 
+  // Block touch events from reaching the map behind the sheet.
+  // Must be non-passive to allow preventDefault (React onTouchMove is passive).
+  // Allow scrolling inside contentRef when expanded and content is scrollable.
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+
+    const block = (e: TouchEvent) => {
+      // If we're actively dragging the sheet, always block
+      if (isDragging.current) {
+        e.preventDefault();
+        return;
+      }
+
+      // Allow scroll inside the content area when expanded
+      const content = contentRef.current;
+      if (content && content.contains(e.target as Node)) {
+        const expanded = currentY.current < snapHalf.current * 0.5;
+        if (expanded && content.scrollHeight > content.clientHeight) {
+          // Allow native scroll
+          return;
+        }
+      }
+
+      // Block everything else (prevents map from moving)
+      e.preventDefault();
+    };
+
+    el.addEventListener("touchmove", block, { passive: false });
+    return () => el.removeEventListener("touchmove", block);
+  }, []);
+
   // --- Desktop panel ---
   const desktopPanel = (
     <div className="hidden md:flex absolute right-0 top-0 bottom-0 w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl z-20 flex-col border-l border-gray-100 animate-slide-in">
@@ -343,9 +376,9 @@ export default function RestaurantPanel({
   // --- Mobile bottom sheet ---
   const mobileSheet = (
     <div
+      ref={rootRef}
       className="md:hidden fixed inset-0 z-50"
       style={{ touchAction: "none" }}
-      onTouchMove={(e) => e.preventDefault()}
     >
       {/* Backdrop - blocks all map interaction */}
       <div
