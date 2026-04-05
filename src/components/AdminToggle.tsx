@@ -82,7 +82,7 @@ export default function AdminToggle({ isAdmin, onToggle }: Props) {
   return (
     <button
       onClick={() => setShowInput(true)}
-      className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+      className="text-xs text-gray-400 hover:text-gray-600 transition-colors px-3 py-2"
     >
       🔒 관리자
     </button>

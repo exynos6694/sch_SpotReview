@@ -56,33 +56,35 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-gray-50 relative">
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-xl border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+      {/* Mobile Header - floating pills */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 px-3 pt-[env(safe-area-inset-top,8px)] pb-2 flex items-center justify-between pointer-events-none">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          className="pointer-events-auto p-2.5 bg-white/90 backdrop-blur-lg rounded-full shadow-lg shadow-black/8 active:scale-95 transition-transform"
         >
-          <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🗺️</span>
-          <h1 className="text-sm font-bold text-gray-900">SCH 맛집 지도</h1>
+        <div className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 bg-white/90 backdrop-blur-lg rounded-full shadow-lg shadow-black/8">
+          <span className="text-base">🗺️</span>
+          <h1 className="text-xs font-bold text-gray-900">SCH 맛집 지도</h1>
         </div>
-        <AdminToggle isAdmin={isAdmin} onToggle={setIsAdmin} />
+        <div className="pointer-events-auto bg-white/90 backdrop-blur-lg rounded-full shadow-lg shadow-black/8">
+          <AdminToggle isAdmin={isAdmin} onToggle={setIsAdmin} />
+        </div>
       </div>
 
       {/* Sidebar - desktop always visible, mobile overlay */}
       {sidebarOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/40 z-30 mt-[52px]"
+          className="md:hidden fixed inset-0 bg-black/40 z-30"
           onClick={() => setSidebarOpen(false)}
         />
       )}
       <div
         className={`
-          fixed md:relative z-40 md:z-10 h-full mt-[52px] md:mt-0
+          fixed md:relative z-40 md:z-10 h-full mt-0
           transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
@@ -99,7 +101,7 @@ export default function Home() {
       </div>
 
       {/* Map Area */}
-      <div className="flex-1 relative pt-[52px] md:pt-0">
+      <div className="flex-1 relative">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center bg-gray-50">
             <div className="text-center">
