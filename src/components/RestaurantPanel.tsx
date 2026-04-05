@@ -342,13 +342,19 @@ export default function RestaurantPanel({
 
   // --- Mobile bottom sheet ---
   const mobileSheet = (
-    <div className="md:hidden fixed inset-0 z-50" style={{ touchAction: "none" }}>
-      {/* Backdrop */}
+    <div
+      className="md:hidden fixed inset-0 z-50"
+      style={{ touchAction: "none" }}
+      onTouchMove={(e) => e.preventDefault()}
+    >
+      {/* Backdrop - blocks all map interaction */}
       <div
         ref={backdropRef}
         className="absolute inset-0 bg-black"
         style={{ opacity: 0 }}
         onClick={handleClose}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => { e.stopPropagation(); e.preventDefault(); }}
       />
 
       {/* Sheet - full height, positioned via translateY */}
