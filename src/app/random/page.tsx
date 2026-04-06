@@ -12,11 +12,18 @@ export default function RandomPage() {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<Restaurant | null>(null);
   const [displayIndex, setDisplayIndex] = useState(0);
+  const [mode, setMode] = useState<"food" | "pub">("food");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("spot-review-mode") : null;
+    const currentMode: "food" | "pub" = saved === "pub" ? "pub" : "food";
+    setMode(currentMode);
     getRestaurants().then((data) => {
-      setRestaurants(data);
+      const filtered = data.filter((r) =>
+        currentMode === "pub" ? r.category === "pub" : r.category !== "pub"
+      );
+      setRestaurants(filtered);
       setLoading(false);
     });
   }, []);
@@ -83,9 +90,11 @@ export default function RandomPage() {
       </Link>
 
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-        🎲 랜덤 식당 뽑기
+        🎲 랜덤 {mode === "pub" ? "술집" : "식당"} 뽑기
       </h1>
-      <p className="text-sm text-gray-400 mb-10">오늘 뭐 먹지? 고민될 땐 돌려!</p>
+      <p className="text-sm text-gray-400 mb-10">
+        {mode === "pub" ? "오늘 어디서 한잔? 고민될 땐 돌려!" : "오늘 뭐 먹지? 고민될 땐 돌려!"}
+      </p>
 
       {loading ? (
         <div className="text-center">

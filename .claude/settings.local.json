@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx:*)",
-      "Bash(find /Users/exynos6694/Desktop/spot_review -name tailwind.config.* -o -name .tailwindcss)"
+      "Bash(find /Users/exynos6694/Desktop/spot_review -name tailwind.config.* -o -name .tailwindcss)",
+      "Bash(xargs ls:*)"
     ]
   }
 }

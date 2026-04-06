@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORIES } from "@/types";
+import { CATEGORIES, OPERATING_HOURS_PRESETS } from "@/types";
 import { addRestaurant } from "@/lib/firestore";
 
 interface Props {
@@ -9,12 +9,15 @@ interface Props {
   lng: number;
   onClose: () => void;
   onAdded: () => void;
+  defaultCategory?: string;
 }
 
-export default function AddRestaurantModal({ lat, lng, onClose, onAdded }: Props) {
+export default function AddRestaurantModal({ lat, lng, onClose, onAdded, defaultCategory }: Props) {
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("korean");
+  const [category, setCategory] = useState(defaultCategory || "korean");
   const [description, setDescription] = useState("");
+  const [operatingHours, setOperatingHours] = useState("모름");
+  const [customHours, setCustomHours] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -29,6 +32,7 @@ export default function AddRestaurantModal({ lat, lng, onClose, onAdded }: Props
       lng,
       address: "",
       description: description.trim(),
+      operatingHours: operatingHours === "직접 입력" ? customHours.trim() || "모름" : operatingHours,
     });
     setSubmitting(false);
     onAdded();
@@ -93,6 +97,30 @@ export default function AddRestaurantModal({ lat, lng, onClose, onAdded }: Props
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              운영시간
+            </label>
+            <select
+              value={operatingHours}
+              onChange={(e) => setOperatingHours(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+            >
+              {OPERATING_HOURS_PRESETS.map((preset) => (
+                <option key={preset} value={preset}>{preset}</option>
+              ))}
+            </select>
+            {operatingHours === "직접 입력" && (
+              <input
+                type="text"
+                value={customHours}
+                onChange={(e) => setCustomHours(e.target.value)}
+                placeholder="예: 평일 11:00-21:00, 주말 휴무"
+                className="w-full mt-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+              />
+            )}
           </div>
 
           <div>

@@ -13,10 +13,23 @@ export default function Home() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [filterCategory, setFilterCategory] = useState("all");
+  const [mode, setMode] = useState<"food" | "pub">("food");
   const [addModal, setAddModal] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Restore mode from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("spot-review-mode");
+    if (saved === "food" || saved === "pub") setMode(saved);
+  }, []);
+
+  const handleModeChange = useCallback((newMode: "food" | "pub") => {
+    setMode(newMode);
+    setFilterCategory("all");
+    localStorage.setItem("spot-review-mode", newMode);
+  }, []);
 
   async function loadRestaurants() {
     const data = await getRestaurants();
@@ -50,7 +63,11 @@ export default function Home() {
     setSidebarOpen(false);
   }, []);
 
-  const filteredRestaurants = restaurants.filter(
+  const modeFilteredRestaurants = restaurants.filter((r) =>
+    mode === "pub" ? r.category === "pub" : r.category !== "pub"
+  );
+
+  const filteredRestaurants = modeFilteredRestaurants.filter(
     (r) => filterCategory === "all" || r.category === filterCategory
   );
 
@@ -66,9 +83,23 @@ export default function Home() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
         </button>
-        <div className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 bg-white/90 backdrop-blur-lg rounded-full shadow-lg shadow-black/8">
-          <span className="text-base">🗺️</span>
-          <h1 className="text-xs font-bold text-gray-900">SCH 맛집 지도</h1>
+        <div className="pointer-events-auto flex items-center gap-1 px-1 py-1 bg-white/90 backdrop-blur-lg rounded-full shadow-lg shadow-black/8">
+          <button
+            onClick={() => handleModeChange("food")}
+            className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+              mode === "food" ? "bg-indigo-600 text-white" : "text-gray-500"
+            }`}
+          >
+            🍽️ 식당
+          </button>
+          <button
+            onClick={() => handleModeChange("pub")}
+            className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+              mode === "pub" ? "bg-amber-500 text-white" : "text-gray-500"
+            }`}
+          >
+            🍻 술집
+          </button>
         </div>
         <div className="pointer-events-auto bg-white/90 backdrop-blur-lg rounded-full shadow-lg shadow-black/8">
           <AdminToggle isAdmin={isAdmin} onToggle={setIsAdmin} />
@@ -90,13 +121,15 @@ export default function Home() {
         `}
       >
         <Sidebar
-          restaurants={restaurants}
+          restaurants={modeFilteredRestaurants}
           selectedId={selectedRestaurant?.id ?? null}
           onSelect={handleSelect}
           filterCategory={filterCategory}
           onFilterChange={setFilterCategory}
           isAdmin={isAdmin}
           onAdminToggle={setIsAdmin}
+          mode={mode}
+          onModeChange={handleModeChange}
         />
       </div>
 
@@ -136,6 +169,7 @@ export default function Home() {
           lng={addModal.lng}
           onClose={() => setAddModal(null)}
           onAdded={loadRestaurants}
+          defaultCategory={mode === "pub" ? "pub" : "korean"}
         />
       )}
     </div>

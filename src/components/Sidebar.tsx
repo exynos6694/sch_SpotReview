@@ -14,6 +14,8 @@ interface Props {
   onFilterChange: (category: string) => void;
   isAdmin: boolean;
   onAdminToggle: (isAdmin: boolean) => void;
+  mode: "food" | "pub";
+  onModeChange: (mode: "food" | "pub") => void;
 }
 
 export default function Sidebar({
@@ -24,6 +26,8 @@ export default function Sidebar({
   onFilterChange,
   isAdmin,
   onAdminToggle,
+  mode,
+  onModeChange,
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -38,12 +42,40 @@ export default function Sidebar({
       <div className="hidden md:block p-5 border-b border-gray-100">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🗺️</span>
-            <h1 className="text-lg font-bold text-gray-900">SCH 맛집 지도</h1>
+            <span className="text-2xl">{mode === "pub" ? "🍻" : "🗺️"}</span>
+            <h1 className="text-lg font-bold text-gray-900">
+              {mode === "pub" ? "SCH 술집 지도" : "SCH 맛집 지도"}
+            </h1>
           </div>
           <AdminToggle isAdmin={isAdmin} onToggle={onAdminToggle} />
         </div>
-        <p className="text-xs text-gray-400 ml-9">순천향대 근처 맛집 리뷰</p>
+        <p className="text-xs text-gray-400 ml-9">순천향대 근처 {mode === "pub" ? "술집" : "맛집"} 리뷰</p>
+      </div>
+
+      {/* Mode Toggle */}
+      <div className="p-3 border-b border-gray-100">
+        <div className="flex bg-gray-100 rounded-xl p-1">
+          <button
+            onClick={() => onModeChange("food")}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+              mode === "food"
+                ? "bg-white text-indigo-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            🍽️ 식당
+          </button>
+          <button
+            onClick={() => onModeChange("pub")}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+              mode === "pub"
+                ? "bg-white text-amber-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            🍻 술집
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -72,34 +104,36 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Category Filter */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => onFilterChange("all")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              filterCategory === "all"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-            }`}
-          >
-            전체
-          </button>
-          {CATEGORIES.map((cat) => (
+      {/* Category Filter - only for food mode */}
+      {mode === "food" && (
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex flex-wrap gap-1.5">
             <button
-              key={cat.value}
-              onClick={() => onFilterChange(cat.value)}
+              onClick={() => onFilterChange("all")}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                filterCategory === cat.value
+                filterCategory === "all"
                   ? "bg-indigo-600 text-white"
                   : "bg-gray-50 text-gray-500 hover:bg-gray-100"
               }`}
             >
-              {cat.emoji} {cat.label}
+              전체
             </button>
-          ))}
+            {CATEGORIES.filter((c) => c.value !== "pub").map((cat) => (
+              <button
+                key={cat.value}
+                onClick={() => onFilterChange(cat.value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  filterCategory === cat.value
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                {cat.emoji} {cat.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Restaurant List */}
       <div className="flex-1 overflow-y-auto">
@@ -172,6 +206,12 @@ export default function Sidebar({
             ? "💡 지도를 클릭하면 음식점을 등록할 수 있어요"
             : "💡 음식점을 선택하면 리뷰를 볼 수 있어요"}
         </p>
+        <Link
+          href="/legal"
+          className="block text-[10px] text-gray-300 text-center mt-2 hover:text-gray-500 transition-colors"
+        >
+          이용약관 및 개인정보처리방침
+        </Link>
       </div>
     </div>
   );

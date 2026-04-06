@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Restaurant, Review } from "@/types";
-import { CATEGORIES } from "@/types";
-import { getReviews, addReview, deleteReview } from "@/lib/firestore";
+import { CATEGORIES, OPERATING_HOURS_PRESETS } from "@/types";
+import { getReviews, addReview, deleteReview, uploadReviewPhotos, updateRestaurant } from "@/lib/firestore";
 import { deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import StarRating from "./StarRating";
@@ -31,8 +31,18 @@ export default function RestaurantPanel({
   const [author, setAuthor] = useState("");
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(restaurant.name);
+  const [editDescription, setEditDescription] = useState(restaurant.description);
+  const [editCategory, setEditCategory] = useState(restaurant.category);
+  const [editOperatingHours, setEditOperatingHours] = useState(restaurant.operatingHours || "모름");
+  const [editCustomHours, setEditCustomHours] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // --- Bottom sheet state (refs for 60fps) ---
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -158,19 +168,46 @@ export default function RestaurantPanel({
     setLoading(false);
   }
 
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length + photos.length > 3) {
+      alert("사진은 최대 3장까지 첨부할 수 있습니다.");
+      return;
+    }
+    const newPhotos = [...photos, ...files].slice(0, 3);
+    setPhotos(newPhotos);
+    setPhotoPreviews(newPhotos.map((f) => URL.createObjectURL(f)));
+  }
+
+  function removePhoto(index: number) {
+    URL.revokeObjectURL(photoPreviews[index]);
+    const newPhotos = photos.filter((_, i) => i !== index);
+    setPhotos(newPhotos);
+    setPhotoPreviews(newPhotos.map((f) => URL.createObjectURL(f)));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!author.trim() || !content.trim()) return;
     setSubmitting(true);
+
+    let photoURLs: string[] = [];
+    if (photos.length > 0) {
+      photoURLs = await uploadReviewPhotos(restaurant.id, photos);
+    }
+
     await addReview({
       restaurantId: restaurant.id,
       author: author.trim(),
       rating,
       content: content.trim(),
+      ...(photoURLs.length > 0 ? { photoURLs } : {}),
     });
     setAuthor("");
     setRating(5);
     setContent("");
+    setPhotos([]);
+    setPhotoPreviews([]);
     setShowForm(false);
     setSubmitting(false);
     await loadReviews();
@@ -193,6 +230,19 @@ export default function RestaurantPanel({
     if (!confirm("이 리뷰를 삭제하시겠습니까?")) return;
     await deleteReview(reviewId, restaurant.id);
     await loadReviews();
+    onUpdate();
+  }
+
+  async function handleSaveEdit() {
+    setSaving(true);
+    await updateRestaurant(restaurant.id, {
+      name: editName.trim(),
+      description: editDescription.trim(),
+      category: editCategory,
+      operatingHours: editOperatingHours === "직접 입력" ? editCustomHours.trim() || "모름" : editOperatingHours,
+    });
+    setEditing(false);
+    setSaving(false);
     onUpdate();
   }
 
@@ -326,47 +376,139 @@ export default function RestaurantPanel({
   const desktopPanel = (
     <div className="hidden md:flex absolute right-0 top-0 bottom-0 w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl z-20 flex-col border-l border-gray-100 animate-slide-in">
       <div className="p-6 border-b border-gray-100">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-2xl">{category?.emoji}</span>
-              <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                {category?.label}
-              </span>
+        {editing ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 text-sm">음식점 정보 수정</h3>
+              <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">취소</button>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mt-2">
-              {restaurant.name}
-            </h2>
-            {restaurant.description && (
-              <p className="text-sm text-gray-600 mt-2">{restaurant.description}</p>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="음식점 이름"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+            />
+            <select
+              value={editCategory}
+              onChange={(e) => setEditCategory(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>
+              ))}
+            </select>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">운영시간</label>
+              <select
+                value={editOperatingHours}
+                onChange={(e) => setEditOperatingHours(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+              >
+                {OPERATING_HOURS_PRESETS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              {editOperatingHours === "직접 입력" && (
+                <input
+                  type="text"
+                  value={editCustomHours}
+                  onChange={(e) => setEditCustomHours(e.target.value)}
+                  placeholder="예: 평일 11:00-21:00"
+                  className="w-full mt-2 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+                />
+              )}
+            </div>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="설명"
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-gray-900"
+            />
+            <button
+              onClick={handleSaveEdit}
+              disabled={saving}
+              className="w-full py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              {saving ? "저장 중..." : "저장"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl">{category?.emoji}</span>
+                  <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                    {category?.label}
+                  </span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mt-2">
+                  {restaurant.name}
+                </h2>
+                {restaurant.operatingHours && restaurant.operatingHours !== "모름" && (
+                  <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {restaurant.operatingHours}
+                  </p>
+                )}
+                {restaurant.description && (
+                  <p className="text-sm text-gray-600 mt-2">{restaurant.description}</p>
+                )}
+              </div>
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex items-center gap-4 mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-amber-600">
+                  {restaurant.avgRating > 0 ? restaurant.avgRating : "-"}
+                </div>
+                <div className="text-xs text-amber-600/70 font-medium">평점</div>
+              </div>
+              <div className="flex-1">
+                <StarRating rating={restaurant.avgRating} readonly size="lg" />
+                <p className="text-xs text-gray-500 mt-1">리뷰 {restaurant.reviewCount}개</p>
+              </div>
+            </div>
+            {isAdmin && (
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => {
+                    setEditName(restaurant.name);
+                    setEditDescription(restaurant.description);
+                    setEditCategory(restaurant.category);
+                    const current = restaurant.operatingHours || "모름";
+                    const isPreset = (OPERATING_HOURS_PRESETS as readonly string[]).includes(current);
+                    if (isPreset) {
+                      setEditOperatingHours(current);
+                      setEditCustomHours("");
+                    } else {
+                      setEditOperatingHours("직접 입력");
+                      setEditCustomHours(current);
+                    }
+                    setEditing(true);
+                  }}
+                  className="flex-1 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={handleDeleteRestaurant}
+                  disabled={deleting}
+                  className="flex-1 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {deleting ? "삭제 중..." : "삭제"}
+                </button>
+              </div>
             )}
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex items-center gap-4 mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-amber-600">
-              {restaurant.avgRating > 0 ? restaurant.avgRating : "-"}
-            </div>
-            <div className="text-xs text-amber-600/70 font-medium">평점</div>
-          </div>
-          <div className="flex-1">
-            <StarRating rating={restaurant.avgRating} readonly size="lg" />
-            <p className="text-xs text-gray-500 mt-1">리뷰 {restaurant.reviewCount}개</p>
-          </div>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={handleDeleteRestaurant}
-            disabled={deleting}
-            className="w-full mt-3 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-50"
-          >
-            {deleting ? "삭제 중..." : "🗑️ 음식점 삭제"}
-          </button>
+          </>
         )}
       </div>
       <div className="flex-1 overflow-y-auto p-6">{renderReviews()}</div>
@@ -477,56 +619,118 @@ export default function RestaurantPanel({
         >
           {/* Restaurant info */}
           <div className="px-5 pb-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{category?.emoji}</span>
-                  <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                    {category?.label}
-                  </span>
+            {editing ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-gray-900 text-sm">음식점 정보 수정</h3>
+                  <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">취소</button>
                 </div>
-                <h2 className="text-lg font-bold text-gray-900 mt-2 truncate">
-                  {restaurant.name}
-                </h2>
-              </div>
-              {!isExpanded && (
-                <button
-                  onClick={handleClose}
-                  className="p-2 -mr-2 hover:bg-gray-100 rounded-xl transition-colors"
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="음식점 이름"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+                />
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
                 >
-                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>
+                  ))}
+                </select>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="설명"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-gray-900"
+                />
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                  className="w-full py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {saving ? "저장 중..." : "저장"}
                 </button>
-              )}
-            </div>
-
-            {restaurant.description && (
-              <p className="text-sm text-gray-500 mt-1">{restaurant.description}</p>
-            )}
-
-            {/* Rating */}
-            <div className="flex items-center gap-4 mt-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-amber-600">
-                  {restaurant.avgRating > 0 ? restaurant.avgRating : "-"}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{category?.emoji}</span>
+                      <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                        {category?.label}
+                      </span>
+                    </div>
+                    <h2 className="text-lg font-bold text-gray-900 mt-2 truncate">
+                      {restaurant.name}
+                    </h2>
+                  </div>
+                  {!isExpanded && (
+                    <button
+                      onClick={handleClose}
+                      className="p-2 -mr-2 hover:bg-gray-100 rounded-xl transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
-                <div className="text-[10px] text-amber-600/70 font-medium">평점</div>
-              </div>
-              <div className="flex-1">
-                <StarRating rating={restaurant.avgRating} readonly size="md" />
-                <p className="text-xs text-gray-500 mt-1">리뷰 {restaurant.reviewCount}개</p>
-              </div>
-            </div>
 
-            {isAdmin && (
-              <button
-                onClick={handleDeleteRestaurant}
-                disabled={deleting}
-                className="w-full mt-3 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-50"
-              >
-                {deleting ? "삭제 중..." : "🗑️ 음식점 삭제"}
-              </button>
+                {restaurant.operatingHours && restaurant.operatingHours !== "모름" && (
+                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {restaurant.operatingHours}
+                  </p>
+                )}
+                {restaurant.description && (
+                  <p className="text-sm text-gray-500 mt-1">{restaurant.description}</p>
+                )}
+
+                {/* Rating */}
+                <div className="flex items-center gap-4 mt-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-amber-600">
+                      {restaurant.avgRating > 0 ? restaurant.avgRating : "-"}
+                    </div>
+                    <div className="text-[10px] text-amber-600/70 font-medium">평점</div>
+                  </div>
+                  <div className="flex-1">
+                    <StarRating rating={restaurant.avgRating} readonly size="md" />
+                    <p className="text-xs text-gray-500 mt-1">리뷰 {restaurant.reviewCount}개</p>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => {
+                        setEditName(restaurant.name);
+                        setEditDescription(restaurant.description);
+                        setEditCategory(restaurant.category);
+                        setEditing(true);
+                      }}
+                      className="flex-1 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={handleDeleteRestaurant}
+                      disabled={deleting}
+                      className="flex-1 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      {deleting ? "삭제 중..." : "삭제"}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Expand hint */}
@@ -590,12 +794,44 @@ export default function RestaurantPanel({
               className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-400"
               required
             />
+            {/* Photo upload */}
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">사진 첨부 (최대 3장)</label>
+              <div className="flex items-center gap-2 flex-wrap">
+                {photoPreviews.map((src, i) => (
+                  <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white text-xs flex items-center justify-center rounded-bl-lg"
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+                {photos.length < 3 && (
+                  <label className="w-16 h-16 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                    <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
             <button
               type="submit"
               disabled={submitting}
               className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
-              {submitting ? "등록 중..." : "리뷰 등록"}
+              {submitting ? (photos.length > 0 ? "사진 업로드 중..." : "등록 중...") : "리뷰 등록"}
             </button>
           </form>
         )}
@@ -632,6 +868,19 @@ export default function RestaurantPanel({
                 </div>
                 <StarRating rating={review.rating} readonly size="sm" />
                 <p className="text-sm text-gray-600 mt-2 leading-relaxed">{review.content}</p>
+                {review.photoURLs && review.photoURLs.length > 0 && (
+                  <div className="flex gap-2 mt-2">
+                    {review.photoURLs.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setLightboxImage(url)}
+                        className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 hover:opacity-80 transition-opacity flex-shrink-0"
+                      >
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -644,6 +893,29 @@ export default function RestaurantPanel({
     <>
       {desktopPanel}
       {mobileSheet}
+
+      {/* Photo Lightbox */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+            onClick={() => setLightboxImage(null)}
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={lightboxImage}
+            alt=""
+            className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 }

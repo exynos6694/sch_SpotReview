@@ -12,7 +12,8 @@ import {
   getDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { db, storage } from "./firebase";
 import type { Restaurant, Review } from "@/types";
 
 // === Restaurants ===
@@ -49,6 +50,14 @@ export async function addRestaurant(
   return docRef.id;
 }
 
+export async function updateRestaurant(
+  id: string,
+  data: Partial<Pick<Restaurant, "name" | "description" | "category" | "operatingHours">>
+): Promise<void> {
+  const restaurantRef = doc(db, "restaurants", id);
+  await updateDoc(restaurantRef, data);
+}
+
 // === Reviews ===
 
 export async function getReviews(restaurantId: string): Promise<Review[]> {
@@ -65,13 +74,65 @@ export async function getReviews(restaurantId: string): Promise<Review[]> {
   })) as Review[];
 }
 
+// === Image Upload ===
+
+export async function uploadReviewPhotos(
+  restaurantId: string,
+  files: File[]
+): Promise<string[]> {
+  const urls: string[] = [];
+  for (const file of files) {
+    const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const storageRef = ref(storage, `reviews/${restaurantId}/${fileName}`);
+
+    // Compress if needed (max 1MB)
+    let blob: Blob = file;
+    if (file.size > 1024 * 1024) {
+      blob = await compressImage(file, 1024, 0.8);
+    }
+
+    await uploadBytes(storageRef, blob);
+    const url = await getDownloadURL(storageRef);
+    urls.push(url);
+  }
+  return urls;
+}
+
+async function compressImage(
+  file: File,
+  maxWidth: number,
+  quality: number
+): Promise<Blob> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => resolve(blob || file),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export async function addReview(
   data: Omit<Review, "id" | "createdAt">
 ): Promise<void> {
-  await addDoc(collection(db, "reviews"), {
+  const reviewData: Record<string, unknown> = {
     ...data,
     createdAt: Timestamp.now(),
-  });
+  };
+  if (!data.photoURLs || data.photoURLs.length === 0) {
+    delete reviewData.photoURLs;
+  }
+  await addDoc(collection(db, "reviews"), reviewData);
 
   // Update restaurant average rating
   const reviews = await getReviews(data.restaurantId);

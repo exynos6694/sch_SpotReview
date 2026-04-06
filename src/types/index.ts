@@ -6,10 +6,22 @@ export interface Restaurant {
   lng: number;
   address: string;
   description: string;
+  operatingHours: string; // "모름" or free-form text like "11:00 - 21:00"
   avgRating: number;
   reviewCount: number;
   createdAt: Date;
 }
+
+export const OPERATING_HOURS_PRESETS = [
+  "모름",
+  "24시간",
+  "09:00 - 21:00",
+  "10:00 - 22:00",
+  "11:00 - 21:00",
+  "11:00 - 22:00",
+  "11:30 - 21:30",
+  "직접 입력",
+] as const;
 
 export interface Review {
   id: string;
@@ -17,6 +29,7 @@ export interface Review {
   author: string;
   rating: number;
   content: string;
+  photoURLs?: string[];
   createdAt: Date;
 }
 
