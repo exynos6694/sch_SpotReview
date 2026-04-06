@@ -40,14 +40,13 @@ export default function Sidebar({
     <div className="w-80 bg-white/95 backdrop-blur-xl flex flex-col border-r border-gray-100 z-10 h-full">
       {/* Header - hidden on mobile (mobile has its own header) */}
       <div className="hidden md:block p-5 border-b border-gray-100">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center mb-1">
           <div className="flex items-center gap-2">
             <span className="text-2xl">{mode === "pub" ? "🍻" : "🗺️"}</span>
             <h1 className="text-lg font-bold text-gray-900">
               {mode === "pub" ? "SCH 술집 지도" : "SCH 맛집 지도"}
             </h1>
           </div>
-          <AdminToggle isAdmin={isAdmin} onToggle={onAdminToggle} />
         </div>
         <p className="text-xs text-gray-400 ml-9">순천향대 근처 {mode === "pub" ? "술집" : "맛집"} 리뷰</p>
       </div>
@@ -206,12 +205,18 @@ export default function Sidebar({
             ? "💡 지도를 클릭하면 음식점을 등록할 수 있어요"
             : "💡 음식점을 선택하면 리뷰를 볼 수 있어요"}
         </p>
-        <Link
-          href="/legal"
-          className="block text-[10px] text-gray-300 text-center mt-2 hover:text-gray-500 transition-colors"
-        >
-          이용약관 및 개인정보처리방침
-        </Link>
+        <div className="flex items-center justify-center gap-2 mt-3">
+          <Link
+            href="/legal"
+            className="text-[10px] text-gray-300 hover:text-gray-500 transition-colors"
+          >
+            이용약관 및 정책
+          </Link>
+          <span className="text-gray-200 text-[10px]">|</span>
+          <div className="opacity-50 hover:opacity-100 transition-opacity">
+            <AdminToggle isAdmin={isAdmin} onToggle={onAdminToggle} />
+          </div>
+        </div>
       </div>
     </div>
   );

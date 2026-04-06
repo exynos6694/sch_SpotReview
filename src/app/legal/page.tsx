@@ -51,7 +51,7 @@ export default function LegalPage() {
               <h3 className="font-semibold text-gray-900 mb-1">제1조 (목적)</h3>
               <p>
                 본 약관은 &quot;SCH 맛집 지도&quot; 서비스(이하 &quot;서비스&quot;)의 이용에 관한 조건 및 절차를 규정함을 목적으로 합니다.
-                본 서비스는 순천향대학교 학생들의 편의를 위해 제공되는 비영리 커뮤니티 프로젝트입니다.
+                본 서비스는 <strong>순천향대학교 컴퓨터소프트웨어공학과 학생들만의 한정적인 내부 정보 공유 및 편의</strong>를 위해 제공되는 비상업적·폐쇄적 커뮤니티 프로젝트이며, 불특정 다수를 향한 공개 웹서비스가 아님을 명시합니다.
               </p>
             </div>
             <div>
@@ -333,7 +333,7 @@ export default function LegalPage() {
             <p>서비스 이용 중 문의사항이 있으시면 아래로 연락해 주세요.</p>
             <div className="p-4 bg-indigo-50 rounded-xl space-y-2">
               <p><strong>서비스명:</strong> SCH 맛집 지도</p>
-              <p><strong>운영:</strong> 순천향대학교 학생 프로젝트</p>
+              <p><strong>운영:</strong> 순천향대학교 컴퓨터소프트웨어공학과 내부 프로젝트</p>
               <p><strong>문의:</strong> 서비스 내 관리자에게 문의</p>
             </div>
           </div>

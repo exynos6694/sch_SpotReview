@@ -101,9 +101,7 @@ export default function Home() {
             🍻 술집
           </button>
         </div>
-        <div className="pointer-events-auto bg-white/90 backdrop-blur-lg rounded-full shadow-lg shadow-black/8">
-          <AdminToggle isAdmin={isAdmin} onToggle={setIsAdmin} />
-        </div>
+
       </div>
 
       {/* Sidebar - desktop always visible, mobile overlay */}
