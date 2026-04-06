@@ -230,7 +230,7 @@ export default function LegalPage() {
               <ul className="list-disc pl-5 space-y-1">
                 <li>리뷰 1건당 최대 <strong>3장</strong>의 사진을 첨부할 수 있습니다.</li>
                 <li>사진은 서버에서 자동으로 압축 처리됩니다 (최대 1MB).</li>
-                <li>업로드된 사진은 Firebase Cloud Storage에 저장됩니다.</li>
+                <li>업로드된 사진은 서비스 자체적으로 운영하는 이미지 전용 서버에 안전하게 저장됩니다.</li>
               </ul>
             </div>
             <div>
@@ -292,11 +292,7 @@ export default function LegalPage() {
                   <td className="px-3 py-2">Google LLC</td>
                   <td className="px-3 py-2">데이터베이스 (음식점, 리뷰 저장)</td>
                 </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="px-3 py-2 font-medium">Firebase Storage</td>
-                  <td className="px-3 py-2">Google LLC</td>
-                  <td className="px-3 py-2">리뷰 사진 저장</td>
-                </tr>
+
                 <tr>
                   <td className="px-3 py-2 font-medium">Kakao Maps API</td>
                   <td className="px-3 py-2">Kakao Corp.</td>
