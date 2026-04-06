@@ -92,7 +92,7 @@ export default function KakaoMap({
       const isMobile = window.innerWidth < 768;
       const content = document.createElement("div");
       content.innerHTML = `
-        <div class="map-marker ${isSelected ? 'map-marker-selected' : ''}" style="
+        <div class="${isSelected ? 'map-marker-selected' : ''}" style="
           cursor:pointer;
           display:flex;
           align-items:center;

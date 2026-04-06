@@ -166,18 +166,19 @@ export async function addReview(
   if (!data.photoURLs || data.photoURLs.length === 0) {
     delete reviewData.photoURLs;
   }
-  await addDoc(collection(db, "reviews"), reviewData);
-
-  // Update restaurant average rating
-  const reviews = await getReviews(data.restaurantId);
-  const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0) + data.rating;
-  const newCount = reviews.length + 1;
+  // 기존 리뷰들을 먼저 가져온 뒤 평균과 개수를 계산 (addDoc 이후에 가져오면 로컬 캐시 중복 카운트 방지)
+  const existingReviews = await getReviews(data.restaurantId);
+  const totalRating = existingReviews.reduce((sum, r) => sum + r.rating, 0) + data.rating;
+  const newCount = existingReviews.length + 1;
 
   const restaurantRef = doc(db, "restaurants", data.restaurantId);
   await updateDoc(restaurantRef, {
     avgRating: Math.round((totalRating / newCount) * 10) / 10,
     reviewCount: newCount,
   });
+
+  // 계산이 끝난 후 실제 리뷰 데이터 저장
+  await addDoc(collection(db, "reviews"), reviewData);
 }
 
 export async function deleteReview(reviewId: string, restaurantId: string): Promise<void> {
