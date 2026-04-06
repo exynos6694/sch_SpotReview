@@ -191,27 +191,46 @@ export default function RestaurantPanel({
     if (!author.trim() || !content.trim()) return;
     setSubmitting(true);
 
-    let photoURLs: string[] = [];
-    if (photos.length > 0) {
-      photoURLs = await uploadReviewPhotos(restaurant.id, photos);
-    }
+    try {
+      let photoURLs: string[] = [];
+      if (photos.length > 0) {
+        try {
+          photoURLs = await uploadReviewPhotos(restaurant.id, photos);
+        } catch (err) {
+          console.error("사진 업로드 실패:", err);
+          alert(
+            "사진 업로드에 실패했습니다. 사진 없이 리뷰를 등록합니다.\n" +
+              (err instanceof Error ? err.message : String(err))
+          );
+          photoURLs = [];
+        }
+      }
 
-    await addReview({
-      restaurantId: restaurant.id,
-      author: author.trim(),
-      rating,
-      content: content.trim(),
-      ...(photoURLs.length > 0 ? { photoURLs } : {}),
-    });
-    setAuthor("");
-    setRating(5);
-    setContent("");
-    setPhotos([]);
-    setPhotoPreviews([]);
-    setShowForm(false);
-    setSubmitting(false);
-    await loadReviews();
-    onUpdate();
+      await addReview({
+        restaurantId: restaurant.id,
+        author: author.trim(),
+        rating,
+        content: content.trim(),
+        ...(photoURLs.length > 0 ? { photoURLs } : {}),
+      });
+
+      setAuthor("");
+      setRating(5);
+      setContent("");
+      setPhotos([]);
+      setPhotoPreviews([]);
+      setShowForm(false);
+      await loadReviews();
+      onUpdate();
+    } catch (err) {
+      console.error("리뷰 등록 실패:", err);
+      alert(
+        "리뷰 등록에 실패했습니다.\n" +
+          (err instanceof Error ? err.message : String(err))
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleDeleteRestaurant() {

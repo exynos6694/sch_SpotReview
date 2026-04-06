@@ -12,8 +12,7 @@ import {
   getDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { db, storage } from "./firebase";
+import { db } from "./firebase";
 import type { Restaurant, Review } from "@/types";
 
 // === Restaurants ===
@@ -81,19 +80,36 @@ export async function uploadReviewPhotos(
   files: File[]
 ): Promise<string[]> {
   const urls: string[] = [];
-  for (const file of files) {
-    const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const storageRef = ref(storage, `reviews/${restaurantId}/${fileName}`);
+  const uploadUrl = process.env.NEXT_PUBLIC_IMAGE_SERVER_URL || "https://azsx6694.duckdns.org";
 
+  for (const file of files) {
     // Compress if needed (max 1MB)
     let blob: Blob = file;
     if (file.size > 1024 * 1024) {
       blob = await compressImage(file, 1024, 0.8);
     }
 
-    await uploadBytes(storageRef, blob);
-    const url = await getDownloadURL(storageRef);
-    urls.push(url);
+    const formData = new FormData();
+    formData.append("files", blob, file.name || "image.jpg");
+
+    try {
+      const response = await fetch(`${uploadUrl}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("이미지 서버 전송에 실패했습니다.");
+      }
+
+      const data = await response.json();
+      if (data.urls && data.urls.length > 0) {
+        urls.push(...data.urls);
+      }
+    } catch (e) {
+      console.error(e);
+      throw new Error("이미지 업로드 중 오류가 발생했습니다.");
+    }
   }
   return urls;
 }
@@ -103,22 +119,40 @@ async function compressImage(
   maxWidth: number,
   quality: number
 ): Promise<Blob> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
-      canvas.width = img.width * ratio;
-      canvas.height = img.height * ratio;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(
-        (blob) => resolve(blob || file),
-        "image/jpeg",
-        quality
-      );
+      try {
+        const canvas = document.createElement("canvas");
+        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(blob || file);
+          },
+          "image/jpeg",
+          quality
+        );
+      } catch (err) {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      }
     };
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("이미지를 불러올 수 없습니다."));
+    };
+    img.src = objectUrl;
   });
 }
 
