@@ -68,18 +68,6 @@ export default function KakaoMap({
 
     mapInstanceRef.current = map;
 
-    // University marker
-    const schMarker = new window.kakao.maps.Marker({
-      position: new window.kakao.maps.LatLng(SCH_CENTER.lat, SCH_CENTER.lng),
-      map,
-    });
-
-    const infoWindow = new window.kakao.maps.InfoWindow({
-      content:
-        '<div style="padding:4px 8px;font-size:12px;font-weight:bold;white-space:nowrap;">🎓 순천향대학교</div>',
-    });
-    infoWindow.open(map, schMarker);
-
     // Click to get coordinates - use ref to always get latest callback
     window.kakao.maps.event.addListener(map, "click", (mouseEvent: any) => {
       const latlng = mouseEvent.latLng;

@@ -30,7 +30,7 @@ export default function AdminToggle({ isAdmin, onToggle }: Props) {
     return (
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
-          🔓 관리자
+          관리자
         </span>
         <button
           onClick={() => onToggle(false)}
@@ -84,7 +84,7 @@ export default function AdminToggle({ isAdmin, onToggle }: Props) {
       onClick={() => setShowInput(true)}
       className="text-xs text-gray-400 hover:text-gray-600 transition-colors px-3 py-2"
     >
-      🔒 관리자
+      관리자
     </button>
   );
 }
