@@ -92,25 +92,39 @@ export default function KakaoMap({
       const isMobile = window.innerWidth < 768;
       const content = document.createElement("div");
       content.innerHTML = `
-        <div style="
+        <div class="map-marker ${isSelected ? 'map-marker-selected' : ''}" style="
           cursor:pointer;
           display:flex;
           align-items:center;
-          gap:${isMobile ? "2px" : "4px"};
-          background:${isSelected ? "#4F46E5" : "white"};
+          gap:${isMobile ? "3px" : "5px"};
+          background:${isSelected ? "#4F46E5" : "rgba(255, 255, 255, 0.95)"};
+          backdrop-filter: blur(4px);
           color:${isSelected ? "white" : "#1f2937"};
-          padding:${isMobile ? "3px 6px" : "6px 10px"};
-          border-radius:${isMobile ? "12px" : "20px"};
-          box-shadow:0 2px 8px rgba(0,0,0,0.15);
-          font-size:${isMobile ? "10px" : "13px"};
-          font-weight:600;
+          padding:${isMobile ? "5px 8px" : "7px 12px"};
+          border-radius:${isMobile ? "14px" : "20px"};
+          box-shadow:0 4px 12px rgba(0,0,0,0.12);
+          font-size:${isMobile ? "11px" : "13.5px"};
+          font-weight:700;
           white-space:nowrap;
-          border:${isMobile ? "1.5px" : "2px"} solid ${isSelected ? "#4F46E5" : "#e5e7eb"};
-          transition:all 0.2s;
+          border:${isMobile ? "1.5px" : "2px"} solid ${isSelected ? "#4F46E5" : "white"};
+          transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
         ">
-          <span style="font-size:${isMobile ? "12px" : "16px"};">${emoji}</span>
+          <!-- 마커 꼬리 (역삼각형 모양) -->
+          <div style="
+            position: absolute;
+            bottom: ${isMobile ? "-5px" : "-6px"};
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid ${isSelected ? "#4F46E5" : "rgba(255,255,255,0.95)"};
+          "></div>
+          <span style="font-size:${isMobile ? "13px" : "16px"}; ${isSelected ? 'filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));' : ''}">${emoji}</span>
           <span>${r.name}</span>
-          ${r.avgRating > 0 ? `<span style="color:${isSelected ? "#fde68a" : "#f59e0b"};font-size:${isMobile ? "9px" : "11px"};">★${r.avgRating}</span>` : ""}
+          ${r.avgRating > 0 ? `<span style="color:${isSelected ? "#fde68a" : "#f59e0b"};font-size:${isMobile ? "10px" : "12px"};">★${r.avgRating}</span>` : ""}
         </div>
       `;
 

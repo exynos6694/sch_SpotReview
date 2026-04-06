@@ -19,6 +19,25 @@ body {
 }
 
 /* Custom animations */
+@keyframes marker-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes marker-glow {
+  0% { box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 0 rgba(79, 70, 229, 0.5); }
+  70% { box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 8px rgba(79, 70, 229, 0); }
+  100% { box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 0 rgba(79, 70, 229, 0); }
+}
+
+.map-marker {
+  animation: marker-bounce 3s ease-in-out infinite;
+}
+
+.map-marker-selected {
+  animation: marker-glow 2s infinite;
+  z-index: 10 !important;
+}
 @keyframes slide-in {
   from {
     transform: translateX(100%);

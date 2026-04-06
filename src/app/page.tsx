@@ -141,12 +141,15 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <KakaoMap
-            restaurants={filteredRestaurants}
-            selectedId={selectedRestaurant?.id ?? null}
-            onSelect={handleSelect}
-            onMapClick={handleMapClick}
-          />
+          <div className="w-full h-full relative">
+            <div className="absolute inset-0 pointer-events-none z-10 shadow-[inset_0_0_30px_rgba(0,0,0,0.06)] rounded-2xl border border-black/5 mix-blend-multiply" />
+            <KakaoMap
+              restaurants={filteredRestaurants}
+              selectedId={selectedRestaurant?.id ?? null}
+              onSelect={handleSelect}
+              onMapClick={handleMapClick}
+            />
+          </div>
         )}
 
         {/* Restaurant Detail Panel */}
