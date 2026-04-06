@@ -84,12 +84,41 @@ export default function KakaoMap({
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
+    const isMobile = window.innerWidth < 768;
+
+    // 겹치는 좌표(동일 건물) 분산 알고리즘 (Spiderifier)
+    const groups: Record<string, Restaurant[]> = {};
     restaurants.forEach((r) => {
+      // 소수점 4자리까지 절사 (약 10m 반경을 같은 위치로 인식)
+      const gridX = Math.floor(r.lat * 10000);
+      const gridY = Math.floor(r.lng * 10000);
+      const key = `${gridX},${gridY}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+
+    const displayCoords = new Map<string, { lat: number; lng: number }>();
+    Object.values(groups).forEach((group) => {
+      if (group.length === 1) {
+        displayCoords.set(group[0].id, { lat: group[0].lat, lng: group[0].lng });
+      } else {
+        const radius = isMobile ? 0.00028 : 0.00018; // 모바일에서는 지문 터치를 고려해 약 28m로 더 넓게 퍼트림
+        group.forEach((r, idx) => {
+          const angle = (idx / group.length) * Math.PI * 2;
+          displayCoords.set(r.id, {
+            lat: r.lat + Math.cos(angle) * radius,
+            lng: r.lng + Math.sin(angle) * (radius / 0.8), // 경도 보정
+          });
+        });
+      }
+    });
+
+    restaurants.forEach((r) => {
+      const coords = displayCoords.get(r.id)!;
       const category = CATEGORIES.find((c) => c.value === r.category);
       const emoji = category?.emoji || "📍";
       const isSelected = r.id === selectedId;
 
-      const isMobile = window.innerWidth < 768;
       const content = document.createElement("div");
       content.innerHTML = `
         <div class="${isSelected ? 'map-marker-selected' : ''}" style="
@@ -129,11 +158,16 @@ export default function KakaoMap({
       `;
 
       const overlay = new window.kakao.maps.CustomOverlay({
-        position: new window.kakao.maps.LatLng(r.lat, r.lng),
+        position: new window.kakao.maps.LatLng(coords.lat, coords.lng),
         content,
         yAnchor: 1.3,
         map,
       });
+
+      // 마우스를 올리면 zIndex를 강제로 최상단으로 올려서 겹친 마커도 쉽게 누를 수 있게 함
+      content.onmouseenter = () => overlay.setZIndex(50);
+      content.onmouseleave = () => overlay.setZIndex(isSelected ? 10 : 0);
+      if (isSelected) overlay.setZIndex(10);
 
       content.onclick = () => onSelect(r);
       markersRef.current.push(overlay);
